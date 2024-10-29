@@ -1,8 +1,8 @@
 -- ======================
--- ====    Autor Martín Vázquez 
+-- ====    Autor Martï¿½n Vï¿½zquez 
 -- ====    rquitectura de Computadoras  - 2024
 -- ====
--- ====   Unidad Aritmético Lógica del procesador MIPS
+-- ====   Unidad Aritmï¿½tico Lï¿½gica del procesador MIPS
 -- ======================
 
 
