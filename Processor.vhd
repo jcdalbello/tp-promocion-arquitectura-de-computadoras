@@ -33,8 +33,8 @@ architecture processor_arch of Processor is
 
     -- declaracion de componentes ALU
     component ALU 
-        port  (a	: in std_logic_vector(31 downto 0);
-               b	: in std_logic_vector(31 downto 0);
+        port  (a		: in std_logic_vector(31 downto 0);
+               b		: in std_logic_vector(31 downto 0);
                control	: in std_logic_vector(2 downto 0);
                zero		: out std_logic;
                result	: out std_logic_vector(31 downto 0)); 
@@ -53,11 +53,11 @@ architecture processor_arch of Processor is
                data2_rd	: out std_logic_vector(31 downto 0));
     end component;
 
-    -- señales de control 
+    -- seÃ±ales de control 
     signal RegWrite, RegDst, Branch, MemRead, MemtoReg, MemWrite, ALUSrc, Jump: std_logic;
     signal ALUOp: std_logic_vector(1 downto 0); 
 
--- declarcion de otras señales 
+-- declarcion de otras seÃ±ales 
     signal r_wr: std_logic; -- habilitacion de escritura en el banco de registros
     signal reg_wr: std_logic_vector(4 downto 0); -- direccion del registro de escritura
     signal data1_reg, data2_reg: std_logic_vector(31 downto 0); -- registros leidos desde el banco de registro
@@ -69,11 +69,21 @@ architecture processor_arch of Processor is
     signal reg_pc, next_reg_pc: std_logic_vector(31 downto 0); -- correspondientes al registro del program counter
  
     signal ALU_oper_b : std_logic_vector(31 downto 0); -- corrspondiente al segundo operando de ALU
-    signal ALU_control: std_logic_vector(2 downto 0); -- señales de control de la ALU
+    signal ALU_control: std_logic_vector(2 downto 0); -- seÃ±ales de control de la ALU
     signal ALU_zero: std_logic; -- flag zero de la ALU
     signal ALU_result: std_logic_vector(31 downto 0); -- resultado de la ALU  
 
     signal inm_extended: std_logic_vector(31 downto 0); -- describe el operando inmediato de la instruccion extendido a 32 bits
+    
+    -- segmentos de las instrucciones
+    signal op:	std_logic_vector(5 downto 0);
+    signal rs: std_logic_vector(4 downto 0);
+    signal rt: std_logic_vector(4 downto 0);
+    signal rd: std_logic_vector(4 downto 0);
+    signal shamt: std_logic_vector(4 downto 0);
+    signal funct: std_logic_vector(5 downto 0);
+    signal inmediate: std_logic_vector(15 downto 0);
+    signal target_address: std_logic_vector(25 downto 0);
 
 begin 	
 
@@ -96,6 +106,20 @@ begin
 			data_wr => , 
 			data1_rd => ,
 			data2_rd => ); 
+
+
+-- signals para las partes de la instruccion
+
+	op <= I_DataIn(31 downto 26);
+    rs <= I_DataIn(25 downto 21)
+    rt <= I_DataIn(20 downto 16);
+    rd <= I_DataIn(15 downto 11);
+    rd <= I_DataIn(15 downto 11);
+    shamt <= I_DataIn(10 downto 6);
+    funct <= I_DataIn(5 downto 0);
+    inmediate <= I_DataIn(15 downto 0);
+    target_address <= I_DataIn(25 downto 0);
+
 
 -- PC
 	-- incremento normal del pc
@@ -149,11 +173,77 @@ begin
     -- mux que maneja carga de PC
    
 -- Contador de programa
+	
+
 
 
  
 -- Unidad de Control
-  
+-- Para setear las signals RegWrite, RegDst, Branch, MemRead, MemtoReg, MemWrite, ALUSrc, Jump: std_logic y ALUOp std_logic_vector(1 downto 0);
+-- Se usan los 6 bits mas significativos de la instruccion (31 downto 26)
+	process (op)
+	begin
+    	if op = "000000" then -- instrucciones de tipo-R
+        	RegWrite <= '1';
+            RegDst	 <= '1';
+            Branch	 <= '0';
+            MemRead	 <= '0';
+            MemtoReg <= '0';
+            MemWrite <= '0';
+            ALUSrc	 <= '0';
+            Jump	 <= '0';
+            ALUOp	 <= "10";
+            
+        elsif op = "100011" then -- lw
+        	RegWrite <= '1';
+            RegDst	 <= '0';
+            Branch	 <= '0';
+            MemRead	 <= '1';
+            MemtoReg <= '1';
+            MemWrite <= '0';
+            ALUSrc	 <= '1';
+            Jump	 <= '0';
+            ALUOp	 <= "00";
+            
+        elsif op = "101011" then -- sw
+        	RegWrite <= '0';
+            -- RegDst no importa
+            Branch	 <= '0';
+            MemRead	 <= '0';
+            -- MemtoReg no importa
+            MemWrite <= '1';
+            ALUSrc	 <= '1';
+            Jump	 <= '0';
+            ALUOp	 <= "00";
+            
+        elsif op = "000100" then -- beq
+        	RegWrite <= '0';
+            -- RegDst no importa
+            Branch	 <= '1';
+            MemRead	 <= '0';
+            -- MemtoReg no importa
+            MemWrite <= '0';
+            ALUSrc	 <= '0';
+            Jump	 <= '0';
+            ALUOp	 <= "01";
+        
+        -- TODO: CHECKEAR SI LOS FLAGS DE jump ESTAN BIEN
+        elsif op = "000010" then -- jump
+        	RegWrite <= '0';
+            --RegDst no importa, no se va a guardar en el banco de regs
+            Branch	 <= '0';
+            MemRead	 <= '0';
+            --MemtoReg no importa
+            MemWrite <= '0'';
+            --ALUSrc no importa
+            Jump	 <= '1';
+            --ALUOp no importa
+
+        else -- las signals quedan sin modificar
+           null;
+        
+        end if;
+    end process;
   
     -- mux que maneja escritura en banco de registros
  
