@@ -96,7 +96,7 @@ begin
     I_WrStb <= '0';
     I_DataOut <= (others => '0'); -- dato que nunca se carga en memoria de programa
 
-    
+
 -- Instanciacion de banco de registros
     E_Regs:  Registers 
 	   Port map (
@@ -128,15 +128,16 @@ begin
 	-- incremento normal del pc
 	pc_4 <= reg_pc+4;
     -- incremento por beq
-    direccion_salto_condicional <= offset & "00";
+    direccion_salto_condicional <= pc_4 + shift_left(inm_extended, 2); -- inm_extended = offset ya pasado por la extension de signo
+
     -- incremento por jump
-    direccion_salto_incondicional <= pc_4(31 downto 28) & (target_address & "00");
-    
+    direccion_salto_incondicional <= pc_4(31 downto 28) & shift_left(target_address, 2);
+
     -- mux de para destino de escritura en banco de registros
     -- MUX modelado con las tres entradas posibles del pc: incremento normal, salto condicional y salto incondicional
     -- pc_branch CONDICION_SALTO_CONDICIONAL -> branch=1 y zero=1
     -- pc_jump CONDICION_SALTO_INCONDICIONAL -> jump=1
-    next_reg_pc <= (pc_4 + direccion_salto_condicional) when (Branch and ALU_zero) else direccion_salto_incondicional when (Jump) else pc_4;
+    next_reg_pc <= (direccion_salto_condicional) when (Branch and ALU_zero) else direccion_salto_incondicional when (Jump) else pc_4;
 
 	-- caja del pc
 	process (clk, reset)
@@ -149,14 +150,14 @@ begin
         end if;
       end if; 
     end process;
-    
-    
+
+
 -- extension de signo del operando inmediato de la instruccion
-	inm_extended <= (others => I_DataIn(15)) & I_DataIn(15 downto 0);
-    
+	inm_extended <= (others => I_DataIn(15)) & I_DataIn(15 downto 0); -- offset = I_DataIn(15 downto 0)
+
 -- mux correspondiente a segundo operando de ALU
     ALU_oper_b <= data2_RegRead when ALUSrc = '0' else inm_extended;
-        
+
 -- Instanciacion de ALU
     E_ALU: ALU port map(
             a => data1_RegRead , 
@@ -172,11 +173,27 @@ begin
         	when "00" => -- lw o sw
             	ALU_control <= "010";
             
-           	when "01" => --branch
+           	when "01" => -- branch
             	ALU_control <= "110";
-            	
-        
-    
+                
+            when "10" => -- tipo-R
+            	case funct is
+                	when "100000" => -- add
+                    	ALU_control <= "010";
+                   	when "100010" => -- sub
+                    	ALU_control <= "110";
+                    when "100100" => -- and
+                    	ALU_control <= "000";
+                    when "100101" => -- or
+                    	ALU_control <= "001";
+                    when "101010" => -- slt
+                    	ALU_control <= "111";
+                    when others => -- codigo sin usar
+                    	ALU_control <= "011";
+
+            when others => -- ALUOp incorrecto
+            	ALU_control <= "011";
+
 
       -- determina salto incondicional
 
@@ -191,13 +208,8 @@ begin
     end process;
    
 -- Contador de programa
-	
 
 
-
-
-
- 
 -- Unidad de Control
 -- Para setear las signals RegWrite, RegDst, Branch, MemRead, MemtoReg, MemWrite, ALUSrc, Jump: std_logic y ALUOp std_logic_vector(1 downto 0);
 -- Se usan los 6 bits mas significativos de la instruccion (31 downto 26)
@@ -258,12 +270,14 @@ begin
             --ALUSrc no importa
             Jump	 <= '1';
             --ALUOp no importa
+        end if;
     end process;
-  
-    -- mux que maneja escritura en banco de registros
- 
+
+	-- mux que maneja escritura en banco de registros
+    data_wr <= D_DataOut when MemtoReg else ALU_result; -- FALTA INSTANCIAR DataMemory
 
     -- Manejo de memorias de Datos
+    
 --    D_Addr <= ; resultado de la ALU
 --    D_RdStb <= MemRead;
 --    D_WrStb <= MemWrite;
