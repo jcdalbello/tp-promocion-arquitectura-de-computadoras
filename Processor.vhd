@@ -67,6 +67,7 @@ architecture processor_arch of Processor is
     signal pc_branch: std_logic_vector(31 downto 0); -- salto por beq
     signal pc_jump: std_logic_vector(31 downto 0); -- para salto incondicional
     signal reg_pc, next_reg_pc: std_logic_vector(31 downto 0); -- correspondientes al registro del program counter
+    signal direccion_salto_condicional: std_logic_vector(17 downto 0); -- direccion condicional del beq
  
     signal ALU_oper_b : std_logic_vector(31 downto 0); -- corrspondiente al segundo operando de ALU
     signal ALU_control: std_logic_vector(2 downto 0); -- señales de control de la ALU
@@ -75,14 +76,16 @@ architecture processor_arch of Processor is
 
     signal inm_extended: std_logic_vector(31 downto 0); -- describe el operando inmediato de la instruccion extendido a 32 bits
     
+    signal data1_RegRead, data2_RegRead: std_logic_vector(31 downto 0); -- salida de los registros antes de la ALU
+    
     -- segmentos de las instrucciones
-    signal op:	std_logic_vector(5 downto 0);
+    signal op: std_logic_vector(5 downto 0);
     signal rs: std_logic_vector(4 downto 0);
     signal rt: std_logic_vector(4 downto 0);
     signal rd: std_logic_vector(4 downto 0);
     signal shamt: std_logic_vector(4 downto 0);
     signal funct: std_logic_vector(5 downto 0);
-    signal inmediate: std_logic_vector(15 downto 0);
+    signal offset: std_logic_vector(15 downto 0);
     signal target_address: std_logic_vector(25 downto 0);
 
 begin 	
@@ -100,12 +103,12 @@ begin
 			clk => clk, 
 			reset => reset, 
 			wr => RegWrite,
-			reg1_rd => I_DataIn(25 downto 21), 
-			reg2_rd => I_DataIn(20 downto 16), 
-			reg_wr => ,
+			reg1_rd => I_DataIn(25 downto 21),
+			reg2_rd => I_DataIn(20 downto 16),
+			reg_wr => , -- deberia quedar siempre en 1?
 			data_wr => , 
-			data1_rd => ,
-			data2_rd => ); 
+			data1_rd => data1_RegRead,
+			data2_rd => data2_RegRead); 
 
 
 -- signals para las partes de la instruccion
@@ -117,19 +120,23 @@ begin
     rd <= I_DataIn(15 downto 11);
     shamt <= I_DataIn(10 downto 6);
     funct <= I_DataIn(5 downto 0);
-    inmediate <= I_DataIn(15 downto 0);
+    offset <= I_DataIn(15 downto 0);
     target_address <= I_DataIn(25 downto 0);
 
 
--- PC
+	-- PC
 	-- incremento normal del pc
 	pc_4 <= reg_pc+4;
+    -- incremento por beq
+    direccion_salto_condicional <= offset & "00";
+    -- incremento por jump
+    direccion_salto_incondicional <= pc_4(31 downto 28) & (target_address & "00");
     
     -- mux de para destino de escritura en banco de registros
     -- MUX modelado con las tres entradas posibles del pc: incremento normal, salto condicional y salto incondicional
     -- pc_branch CONDICION_SALTO_CONDICIONAL -> branch=1 y zero=1
     -- pc_jump CONDICION_SALTO_INCONDICIONAL -> jump=1
-    next_reg_pc <= DIRECCION_SALTO_CONDICIONAL when (CONDICION_SALTO_CONDICIONAL) else DIRECCION_SALTO_INCONDICIONAL when (CONDICION_SALTO_INCONDICIONAL) else pc_4;
+    next_reg_pc <= (pc_4 + direccion_salto_condicional) when (Branch and ALU_zero) else direccion_salto_incondicional when (Jump) else pc_4;
 
 	-- caja del pc
 	process (clk, reset)
@@ -145,35 +152,48 @@ begin
     
     
 -- extension de signo del operando inmediato de la instruccion
-  
+	inm_extended <= (others => I_DataIn(15)) & I_DataIn(15 downto 0);
     
 -- mux correspondiente a segundo operando de ALU
-   
+    ALU_oper_b <= data2_RegRead when ALUSrc = '0' else inm_extended;
         
 -- Instanciacion de ALU
     E_ALU: ALU port map(
-            a => , 
-            b => , 
-            control => ,
-            zero => , 
+            a => data1_RegRead , 
+            b => ALU_oper_b , 
+            control => ALU_control ,
+            zero => ALU_zero , 
             result => ALU_result);
 
 -- Control de la ALU
+    process (ALUOp, funct)
+    begin
+    	case ALUOp is
+        	when "00" => -- lw o sw
+            	ALU_control <= "010";
+            
+           	when "01" => --branch
+            	ALU_control <= "110";
+            	
+        
     
 
-    -- determina salto incondicional
-    
+      -- determina salto incondicional
 
-    -- determina salto condicional por iguales
 
-    
-    -- incremento de PC
+      -- determina salto condicional por iguales
 
-    
-    -- mux que maneja carga de PC
+
+      -- incremento de PC
+
+
+      -- mux que maneja carga de PC
+    end process;
    
 -- Contador de programa
 	
+
+
 
 
 
@@ -238,11 +258,6 @@ begin
             --ALUSrc no importa
             Jump	 <= '1';
             --ALUOp no importa
-
-        else -- las signals quedan sin modificar
-           null;
-        
-        end if;
     end process;
   
     -- mux que maneja escritura en banco de registros
