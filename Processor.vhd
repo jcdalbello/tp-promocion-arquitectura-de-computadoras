@@ -17,7 +17,7 @@ port(
 	I_Addr      : out std_logic_vector(31 downto 0);
 	I_RdStb     : out std_logic;
 	I_WrStb     : out std_logic;
-	I_DataOut   : out std_logic_vector(31 downto 0);
+    I_DataOut   : out std_logic_vector(31 downto 0); -- no se usa
 	I_DataIn    : in  std_logic_vector(31 downto 0);
 	-- Data memory
 
@@ -51,6 +51,32 @@ architecture processor_arch of Processor is
                data_wr	: in std_logic_vector(31 downto 0);
                data1_rd : out std_logic_vector(31 downto 0);
                data2_rd	: out std_logic_vector(31 downto 0));
+    end component;
+    
+  	-- declaracion de la memoria de programa
+    component ProgramMemory
+    	port (
+          Addr		: in std_logic_vector(31 downto 0);
+          DataIn	: in std_logic_vector(31 downto 0);
+          RdStb 	: in std_logic ;
+          WrStb		: in std_logic ;
+          Clk		: in std_logic ;
+          Reset		: in std_logic ;						  
+          DataOut	: out std_logic_vector(31 downto 0));
+    	);
+    end component;
+
+    -- declaracion de la memoria de datos
+    component DataMemory
+    	port (
+			Addr	: in std_logic_vector(31 downto 0);
+			DataIn	: in std_logic_vector(31 downto 0);
+			RdStb	: in std_logic ;
+			WrStb	: in std_logic ;
+			Clk		: in std_logic ;
+			Reset	: in std_logic ;
+			DataOut : out std_logic_vector(31 downto 0));
+    	);
     end component;
 
     -- señales de control 
@@ -91,24 +117,49 @@ architecture processor_arch of Processor is
 begin 	
 
 -- Interfaz con memoria de Instrucciones
-    I_Addr <= reg_pc; -- el PC
+    I_Addr <= reg_pc; -- el pc
     I_RdStb <= '1';
     I_WrStb <= '0';
     I_DataOut <= (others => '0'); -- dato que nunca se carga en memoria de programa
 
 
 -- Instanciacion de banco de registros
-    E_Regs:  Registers 
-	   Port map (
+	E_Regs:  Registers 
+		Port map (
 			clk => clk, 
 			reset => reset, 
 			wr => RegWrite,
 			reg1_rd => I_DataIn(25 downto 21),
 			reg2_rd => I_DataIn(20 downto 16),
-			reg_wr => , -- deberia quedar siempre en 1?
-			data_wr => , 
+			reg_wr => reg_wr,
+			data_wr => data_Write, 
 			data1_rd => data1_RegRead,
-			data2_rd => data2_RegRead); 
+			data2_rd => data2_RegRead
+		);
+
+-- Instanciacion de la memoria de programa (ProgramMemory)
+	E_ProgramMemory : ProgramMemory
+		port map (
+          Addr => I_Addr; -- pc
+          DataIn => I_DataOut;
+          RdStb => I_RdStb;
+          WrStb => I_WrStb;
+          Clk => clk;
+          Reset => reset;						  
+          DataOut => I_DataIn; -- recibe la instruccion del pc
+        );
+
+-- Instanciacion de la memoria de datos (DataMemory)
+    E_DataMemory : DataMemory
+		port map (
+			Addr => D_Addr;
+			DataIn => D_DataOut;
+			RdStb => D_RdStb;
+			WrStb => D_WrStb;
+			Clk => clk;
+			Reset => reset;
+			DataOut => D_DataIn; -- lo que sale de la memoria de datos, read data
+    	);
 
 
 -- signals para las partes de la instruccion
@@ -127,16 +178,14 @@ begin
 	-- PC
 	-- incremento normal del pc
 	pc_4 <= reg_pc+4;
+    
     -- incremento por beq
     direccion_salto_condicional <= pc_4 + shift_left(inm_extended, 2); -- inm_extended = offset ya pasado por la extension de signo
 
     -- incremento por jump
     direccion_salto_incondicional <= pc_4(31 downto 28) & shift_left(target_address, 2);
 
-    -- mux de para destino de escritura en banco de registros
     -- MUX modelado con las tres entradas posibles del pc: incremento normal, salto condicional y salto incondicional
-    -- pc_branch CONDICION_SALTO_CONDICIONAL -> branch=1 y zero=1
-    -- pc_jump CONDICION_SALTO_INCONDICIONAL -> jump=1
     next_reg_pc <= (direccion_salto_condicional) when (Branch and ALU_zero) else direccion_salto_incondicional when (Jump) else pc_4;
 
 	-- caja del pc
@@ -151,12 +200,16 @@ begin
       end if; 
     end process;
 
+	-- mux de para destino de escritura en banco de registros
+	-- mux para controlar direccion de entrada del banco de registros
+    reg_wr <= rd when RegDst else rt;
+
 
 -- extension de signo del operando inmediato de la instruccion
 	inm_extended <= (others => I_DataIn(15)) & I_DataIn(15 downto 0); -- offset = I_DataIn(15 downto 0)
 
 -- mux correspondiente a segundo operando de ALU
-    ALU_oper_b <= data2_RegRead when ALUSrc = '0' else inm_extended;
+    ALU_oper_b <= inm_extended when ALUSrc else data2_RegRead;
 
 -- Instanciacion de ALU
     E_ALU: ALU port map(
@@ -195,15 +248,10 @@ begin
             	ALU_control <= "011";
 
 
+	-- PREGUNTAR SI ESTA BIEN HACER TODO ESTO AFUERA DEL PROCESO
       -- determina salto incondicional
-
-
       -- determina salto condicional por iguales
-
-
       -- incremento de PC
-
-
       -- mux que maneja carga de PC
     end process;
    
@@ -259,7 +307,6 @@ begin
             Jump	 <= '0';
             ALUOp	 <= "01";
         
-        -- TODO: CHECKEAR SI LOS FLAGS DE jump ESTAN BIEN
         elsif op = "000010" then -- jump
         	RegWrite <= '0';
             --RegDst no importa, no se va a guardar en el banco de regs
@@ -270,17 +317,29 @@ begin
             --ALUSrc no importa
             Jump	 <= '1';
             --ALUOp no importa
+            
+        else -- codigo de instruccion incorrecto
+        	RegWrite <= '0';
+            RegDst	 <= '0';
+            Branch	 <= '0';
+            MemRead	 <= '0';
+            MemtoReg <= '0';
+            MemWrite <= '0';
+            ALUSrc	 <= '0';
+            Jump	 <= '0';
+            ALUOp	 <= "00";
         end if;
     end process;
 
 	-- mux que maneja escritura en banco de registros
-    data_wr <= D_DataOut when MemtoReg else ALU_result; -- FALTA INSTANCIAR DataMemory
+    data_Write <= D_DataIn when MemtoReg else ALU_result;
 
     -- Manejo de memorias de Datos
     
---    D_Addr <= ; resultado de la ALU
---    D_RdStb <= MemRead;
---    D_WrStb <= MemWrite;
---    D_DataOut <= ALU_result ;
+	D_Addr <= ALU_result;
+    D_RdStb <= MemRead;
+    D_WrStb <= MemWrite;
+    D_DataOut <= data2_RegRead;
+--    D_DataOut <= ALU_result ; PREGUNTAR AL PROFE
 
 end processor_arch;
