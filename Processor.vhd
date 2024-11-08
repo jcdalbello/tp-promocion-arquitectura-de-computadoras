@@ -8,6 +8,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.STD_LOGIC_SIGNED.all;
+use ieee.numeric_std.all;
 
 entity Processor is
 port(
@@ -63,7 +64,6 @@ architecture processor_arch of Processor is
           Clk		: in std_logic ;
           Reset		: in std_logic ;						  
           DataOut	: out std_logic_vector(31 downto 0));
-    	);
     end component;
 
     -- declaracion de la memoria de datos
@@ -76,7 +76,6 @@ architecture processor_arch of Processor is
 			Clk		: in std_logic ;
 			Reset	: in std_logic ;
 			DataOut : out std_logic_vector(31 downto 0));
-    	);
     end component;
 
     -- señales de control 
@@ -94,6 +93,7 @@ architecture processor_arch of Processor is
     signal pc_jump: std_logic_vector(31 downto 0); -- para salto incondicional
     signal reg_pc, next_reg_pc: std_logic_vector(31 downto 0); -- correspondientes al registro del program counter
     signal direccion_salto_condicional: std_logic_vector(17 downto 0); -- direccion condicional del beq
+    signal direccion_salto_incondicional: std_logic_vector(17 downto 0); -- direccion incondicional del jump
  
     signal ALU_oper_b : std_logic_vector(31 downto 0); -- corrspondiente al segundo operando de ALU
     signal ALU_control: std_logic_vector(2 downto 0); -- señales de control de la ALU
@@ -103,6 +103,8 @@ architecture processor_arch of Processor is
     signal inm_extended: std_logic_vector(31 downto 0); -- describe el operando inmediato de la instruccion extendido a 32 bits
     
     signal data1_RegRead, data2_RegRead: std_logic_vector(31 downto 0); -- salida de los registros antes de la ALU
+    signal data_Write: std_logic_vector(31 downto 0); -- dato para escribir en el registro (tipo-R o lw)
+    signal I_DataIn_signal: std_logic_vector(31 downto 0); -- recibe el dato de entrada de la memoria de instrucciones
     
     -- segmentos de las instrucciones
     signal op: std_logic_vector(5 downto 0);
@@ -140,39 +142,40 @@ begin
 -- Instanciacion de la memoria de programa (ProgramMemory)
 	E_ProgramMemory : ProgramMemory
 		port map (
-          Addr => I_Addr; -- pc
-          DataIn => I_DataOut;
-          RdStb => I_RdStb;
-          WrStb => I_WrStb;
-          Clk => clk;
-          Reset => reset;						  
-          DataOut => I_DataIn; -- recibe la instruccion del pc
+          Addr => I_Addr, -- pc
+          DataIn => I_DataOut,
+          RdStb => I_RdStb,
+          WrStb => I_WrStb,
+          Clk => clk,
+          Reset => reset,						  
+          DataOut => I_DataIn_signal -- recibe la instruccion del pc
         );
 
 -- Instanciacion de la memoria de datos (DataMemory)
     E_DataMemory : DataMemory
 		port map (
-			Addr => D_Addr;
-			DataIn => D_DataOut;
-			RdStb => D_RdStb;
-			WrStb => D_WrStb;
-			Clk => clk;
-			Reset => reset;
-			DataOut => D_DataIn; -- lo que sale de la memoria de datos, read data
+			Addr => D_Addr,
+			DataIn => D_DataOut,
+			RdStb => D_RdStb,
+			WrStb => D_WrStb,
+			Clk => clk,
+			Reset => reset,
+			DataOut => D_DataIn -- lo que sale de la memoria de datos, read data
     	);
 
 
 -- signals para las partes de la instruccion
 
 	op <= I_DataIn(31 downto 26);
-    rs <= I_DataIn(25 downto 21)
+    rs <= I_DataIn(25 downto 21);
     rt <= I_DataIn(20 downto 16);
-    rd <= I_DataIn(15 downto 11);
     rd <= I_DataIn(15 downto 11);
     shamt <= I_DataIn(10 downto 6);
     funct <= I_DataIn(5 downto 0);
     offset <= I_DataIn(15 downto 0);
     target_address <= I_DataIn(25 downto 0);
+    
+    I_DataIn <= I_DataIn_signal;
 
 
 	-- PC
@@ -194,9 +197,9 @@ begin
       if reset= '1' then
         reg_pc <= (others =>'0');
       elsif (rising_edge(clk)) then
-      if (rising_edge(clk)) then
-          reg_pc <= next_reg_pc
-        end if;
+        if (rising_edge(clk)) then
+            reg_pc <= next_reg_pc;
+          end if;
       end if; 
     end process;
 
@@ -243,16 +246,19 @@ begin
                     	ALU_control <= "111";
                     when others => -- codigo sin usar
                     	ALU_control <= "011";
+                end case;
 
             when others => -- ALUOp incorrecto
             	ALU_control <= "011";
 
 
-	-- PREGUNTAR SI ESTA BIEN HACER TODO ESTO AFUERA DEL PROCESO
-      -- determina salto incondicional
-      -- determina salto condicional por iguales
-      -- incremento de PC
-      -- mux que maneja carga de PC
+          
+    	end case;
+        -- PREGUNTAR SI ESTA BIEN HACER TODO ESTO AFUERA DEL PROCESO
+            -- determina salto incondicional
+            -- determina salto condicional por iguales
+            -- incremento de PC
+            -- mux que maneja carga de PC
     end process;
    
 -- Contador de programa
@@ -313,7 +319,7 @@ begin
             Branch	 <= '0';
             MemRead	 <= '0';
             --MemtoReg no importa
-            MemWrite <= '0'';
+            MemWrite <= '0';
             --ALUSrc no importa
             Jump	 <= '1';
             --ALUOp no importa
