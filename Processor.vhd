@@ -25,7 +25,7 @@ port(
 	D_Addr      : out std_logic_vector(31 downto 0);
 	D_RdStb     : out std_logic;
 	D_WrStb     : out std_logic;
-	D_DataOut   : out std_logic_vector(31 downto 0);
+	D_DataOut   : out std_logic_vector(31 downto 0); -- Write data
 	D_DataIn    : in  std_logic_vector(31 downto 0)
 );
 end Processor;
@@ -92,8 +92,8 @@ architecture processor_arch of Processor is
     signal pc_branch: std_logic_vector(31 downto 0); -- salto por beq
     signal pc_jump: std_logic_vector(31 downto 0); -- para salto incondicional
     signal reg_pc, next_reg_pc: std_logic_vector(31 downto 0); -- correspondientes al registro del program counter
-    signal direccion_salto_condicional: std_logic_vector(17 downto 0); -- direccion condicional del beq
-    signal direccion_salto_incondicional: std_logic_vector(17 downto 0); -- direccion incondicional del jump
+    signal direccion_salto_condicional: std_logic_vector(31 downto 0); -- direccion condicional del beq
+    signal direccion_salto_incondicional: std_logic_vector(31 downto 0); -- direccion incondicional del jump
  
     signal ALU_oper_b : std_logic_vector(31 downto 0); -- corrspondiente al segundo operando de ALU
     signal ALU_control: std_logic_vector(2 downto 0); -- señales de control de la ALU
@@ -101,10 +101,15 @@ architecture processor_arch of Processor is
     signal ALU_result: std_logic_vector(31 downto 0); -- resultado de la ALU  
 
     signal inm_extended: std_logic_vector(31 downto 0); -- describe el operando inmediato de la instruccion extendido a 32 bits
+    signal inm_extended_shifted: std_logic_vector(31 downto 0); -- inm_extended shifteado 2 bits a la izquierda
+    
+    signal target_address_extended: std_logic_vector(27 downto 0); -- target_address extendido 2 bits
+    
+    signal extension_offset: std_logic_vector(15 downto 0); -- cadena para los 16 1s o 0s para la extension de signo del offset
     
     signal data1_RegRead, data2_RegRead: std_logic_vector(31 downto 0); -- salida de los registros antes de la ALU
     signal data_Write: std_logic_vector(31 downto 0); -- dato para escribir en el registro (tipo-R o lw)
-    signal I_DataIn_signal: std_logic_vector(31 downto 0); -- recibe el dato de entrada de la memoria de instrucciones
+    signal I_DataIn_signal, D_DataIn_signal: std_logic_vector(31 downto 0); -- reciben el dato de entrada de la memoria de instrucciones y de datos
     
     -- segmentos de las instrucciones
     signal op: std_logic_vector(5 downto 0);
@@ -139,30 +144,6 @@ begin
 			data2_rd => data2_RegRead
 		);
 
--- Instanciacion de la memoria de programa (ProgramMemory)
-	E_ProgramMemory : ProgramMemory
-		port map (
-          Addr => I_Addr, -- pc
-          DataIn => I_DataOut,
-          RdStb => I_RdStb,
-          WrStb => I_WrStb,
-          Clk => clk,
-          Reset => reset,						  
-          DataOut => I_DataIn_signal -- recibe la instruccion del pc
-        );
-
--- Instanciacion de la memoria de datos (DataMemory)
-    E_DataMemory : DataMemory
-		port map (
-			Addr => D_Addr,
-			DataIn => D_DataOut,
-			RdStb => D_RdStb,
-			WrStb => D_WrStb,
-			Clk => clk,
-			Reset => reset,
-			DataOut => D_DataIn -- lo que sale de la memoria de datos, read data
-    	);
-
 
 -- signals para las partes de la instruccion
 
@@ -170,23 +151,26 @@ begin
     rs <= I_DataIn(25 downto 21);
     rt <= I_DataIn(20 downto 16);
     rd <= I_DataIn(15 downto 11);
-    shamt <= I_DataIn(10 downto 6);
+    shamt <= I_DataIn(10 downto 6); -- no se usa
     funct <= I_DataIn(5 downto 0);
     offset <= I_DataIn(15 downto 0);
     target_address <= I_DataIn(25 downto 0);
-    
-    I_DataIn <= I_DataIn_signal;
-
 
 	-- PC
 	-- incremento normal del pc
 	pc_4 <= reg_pc+4;
     
-    -- incremento por beq
-    direccion_salto_condicional <= pc_4 + shift_left(inm_extended, 2); -- inm_extended = offset ya pasado por la extension de signo
+    -- shifteado 2 bits a la izquieda
+    inm_extended_shifted <= inm_extended(29 downto 0) & "00";
 
+    -- incremento por beq
+    direccion_salto_condicional <= pc_4 + inm_extended_shifted; -- inm_extended = offset ya pasado por la extension de signo
+
+    -- extendido 2 bits
+    target_address_extended <= target_address(25 downto 0) & "00";
+    
     -- incremento por jump
-    direccion_salto_incondicional <= pc_4(31 downto 28) & shift_left(target_address, 2);
+    direccion_salto_incondicional <= pc_4(31 downto 28) & target_address_extended;
 
     -- MUX modelado con las tres entradas posibles del pc: incremento normal, salto condicional y salto incondicional
     next_reg_pc <= (direccion_salto_condicional) when (Branch and ALU_zero) else direccion_salto_incondicional when (Jump) else pc_4;
@@ -209,7 +193,9 @@ begin
 
 
 -- extension de signo del operando inmediato de la instruccion
-	inm_extended <= (others => I_DataIn(15)) & I_DataIn(15 downto 0); -- offset = I_DataIn(15 downto 0)
+	extension_offset <= (others => I_DataIn(15)); -- 16 1s o 0s, dependiendo el bit mas significativo del offset
+	inm_extended <= extension_offset & I_DataIn(15 downto 0); -- offset = I_DataIn(15 downto 0)
+
 
 -- mux correspondiente a segundo operando de ALU
     ALU_oper_b <= inm_extended when ALUSrc else data2_RegRead;
@@ -342,10 +328,9 @@ begin
 
     -- Manejo de memorias de Datos
     
-	D_Addr <= ALU_result;
-    D_RdStb <= MemRead;
-    D_WrStb <= MemWrite;
+	D_Addr	<= ALU_result;
+    D_RdStb	<= MemRead;
+    D_WrStb	<= MemWrite;
     D_DataOut <= data2_RegRead;
---    D_DataOut <= ALU_result ; PREGUNTAR AL PROFE
 
 end processor_arch;
