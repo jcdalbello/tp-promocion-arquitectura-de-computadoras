@@ -109,7 +109,7 @@ architecture processor_arch of Processor is
     
     signal data1_RegRead, data2_RegRead: std_logic_vector(31 downto 0); -- salida de los registros antes de la ALU
     signal data_Write: std_logic_vector(31 downto 0); -- dato para escribir en el registro (tipo-R o lw)
-    signal I_DataIn_signal, D_DataIn_signal: std_logic_vector(31 downto 0); -- reciben el dato de entrada de la memoria de instrucciones y de datos
+    --signal I_DataIn_signal, D_DataIn_signal: std_logic_vector(31 downto 0); -- reciben el dato de entrada de la memoria de instrucciones y de datos
     
     -- segmentos de las instrucciones
     signal op: std_logic_vector(5 downto 0);
