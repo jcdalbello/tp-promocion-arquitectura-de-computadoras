@@ -3,8 +3,8 @@
 -	Schilliro Agustin
 -	Dal Bello Juan Cruz
 
-### Program Counter:
- Se implementa el Program Counter por medio de un proceso explicito que se activa con el cambio de valor de la señal clk (asignada al puerto Clk del procesador). Este proceso reinicia el valor del registro de instruccion a 0 de manera asincrona si `reset` esta activado. Sino, asigna a `reg_pc` el valor de la direccion en memoria de la siguiente instruccion.
+### Contador de programa:
+ Se implementa el contador de programa por medio de un proceso explicito que se activa con el cambio de valor de la señal clk (asignada al puerto Clk del procesador). Este proceso reinicia el valor del registro de instruccion a 0 de manera asincrona si `reset` esta activado. Sino, asigna a `reg_pc` el valor de la direccion en memoria de la siguiente instruccion.
  
 ```vhdl
 process (clk, reset)
