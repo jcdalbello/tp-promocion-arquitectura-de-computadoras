@@ -222,3 +222,12 @@ La memoria del programa trabaja en flanco descendente asegurándose que el proce
 El banco de registros trabaja en flanco descendente para poder actualizar su contenido de manera que los datos estén disponibles antes del siguiente ciclo de instrucción.
 Con la memoria de datos ocurre algo similar con el banco de registros, esta sincronizada con el procesamiento de la instrucción, y trabajando en flanco ascendente se asegura que la escritura este alineada con el ciclo de escritura posterior al procesamiento de la próxima instrucción.
 El contador del programa trabaja en flanco ascendente porque le permite sincronizar el cambio de la dirección de la instrucción con el inicio del ciclo de instrucción. En el flanco ascendente el procesador hace el cálculo para que la memoria de instrucción en flanco descendente la reciba.
+
+
+#### Observaciones finales
+- Debido al delay inicial del programa de 120ns, la primera instruccion del programa toma mas de un ciclo en finalizar. Luego de este retrazo, cada instruccion toma un solo ciclo.
+
+    ![Deley del primer ciclo](imagenes\deley_primer_ciclo.png)
+- Al simular el procesador en el entorno Eda Playground usando EPWave, hay señales asociadas a componentes que trabajan en flanco descendente que se actualizan en ascendente, y viceversa. Sin embargo, esto no significa que los resultados se guarden en ese flanco. Ej: la señal `data_wr` asociada al dato que se va a guardar en el banco de registros se actualiza en flanco ascendente, pero se guarda en flanco descendente.
+
+    ![Deley del primer ciclo](imagenes\distinto_flanco.png)

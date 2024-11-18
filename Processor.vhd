@@ -158,13 +158,13 @@ begin
 
 	-- PC
 	-- incremento normal del pc
-	pc_4 <= std_logic_vector(unsigned(reg_pc) + 4);
+	pc_4 <= reg_pc + 4;
     
     -- shifteado 2 bits a la izquieda
     inm_extended_shifted <= inm_extended(29 downto 0) & "00";
 
     -- incremento por beq
-    direccion_salto_condicional <= std_logic_vector(signed(pc_4) + signed(inm_extended_shifted)); -- inm_extended = offset ya pasado por la extension de signo
+    direccion_salto_condicional <= pc_4 + inm_extended_shifted; -- inm_extended = offset ya pasado por la extension de signo
 
     -- extendido 2 bits
     target_address_extended <= target_address(25 downto 0) & "00";
@@ -181,10 +181,8 @@ begin
       if reset= '1' then
         reg_pc <= (others =>'0');
       elsif (rising_edge(clk)) then
-        if (rising_edge(clk)) then
             reg_pc <= next_reg_pc;
           end if;
-      end if; 
     end process;
 
 	-- mux de para destino de escritura en banco de registros
