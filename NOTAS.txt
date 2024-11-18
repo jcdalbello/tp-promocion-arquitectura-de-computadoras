@@ -1,6 +1,0 @@
-banco de registros: flanco descendente
-pc: flanco ascendente
-memorias: ascendente y descendente (depende cual)
-Para hacer todo en un solo ciclo de reloj
-
-De los archivos vhdl dados por la catedra, solo hay que modificar el Processor.vhd, y solamente cambiar el nombre del archivo que se le pasa al ProcessorTB para cambiar el programa que se le pasa.
