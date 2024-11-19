@@ -225,9 +225,9 @@ El contador del programa trabaja en flanco ascendente porque le permite sincroni
 
 
 #### Observaciones finales
-- Debido al delay inicial del programa de 120ns, la primera instruccion del programa toma mas de un ciclo en finalizar. Luego de este retrazo, cada instruccion toma un solo ciclo.
+- La primera instruccion tiene un deley inicial para poder ejecutarse debido a que necesita dos flancos para poder ejecutarse. En el primer flanco descendente se obtiene la primera instruccion en la posicion 0x0 de la memoria de programa debido al `reset` que pone al contador de programa en ese valor, y recien en el proximo flanco ascendente se obtiene la informacion de la memoria de datos. En el descendente de este mismo ciclo se guardan los datos en el banco de registros, pero esto no se puede visualizar en EPWave. En el proximo ascendente luego de desactivarse el `reset` se va a cargar la proxima instruccion del contador de programa.
 
     ![Deley del primer ciclo](imagenes\deley_primer_ciclo.png)
-- Al simular el procesador en el entorno Eda Playground usando EPWave, hay señales asociadas a componentes que trabajan en flanco descendente que se actualizan en ascendente, y viceversa. Sin embargo, esto no significa que los resultados se guarden en ese flanco. Ej: la señal `data_wr` asociada al dato que se va a guardar en el banco de registros se actualiza en flanco ascendente, pero se guarda en flanco descendente.
+- Al simular el procesador en el entorno Eda Playground usando EPWave, hay señales asociadas a componentes que trabajan en flanco descendente que se actualizan en ascendente, y viceversa. Sin embargo, esto no significa que los resultados se guarden en ese flanco. Ej: la señal `data_wr` asociada al dato que se va a guardar en el banco de registros se actualiza en flanco ascendente, pero se guarda en flanco descendente, lo cual no se puede visualizar en EPWave.
 
     ![Deley del primer ciclo](imagenes\distinto_flanco.png)
