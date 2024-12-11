@@ -1,4 +1,4 @@
 ### Grupo 4
-### Integrantes
-- Agustin Schilliro
+### Integrantes:
 - Juan Cruz Dal Bello
+- Agustin Schilliro
